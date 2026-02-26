@@ -1,0 +1,29 @@
+[project]
+name = "fcp-midi"
+version = "0.1.0"
+description = "MIDI File Context Protocol — semantic MIDI composition for LLMs"
+requires-python = ">=3.11"
+dependencies = [
+    "fastmcp>=3.0",
+    "pretty-midi>=0.2.10",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.4",
+    "pyright>=1.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/fcp_midi"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+src = ["src"]
