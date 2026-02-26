@@ -183,6 +183,9 @@ class IntentLayer:
             return track  # error message
 
         pitch_str = op.params.get("pitch")
+        # Handle midi:N as pitch (tokenizer treats it as key:value)
+        if not pitch_str and "midi" in op.params:
+            pitch_str = f"midi:{op.params['midi']}"
         if not pitch_str:
             return format_result(False, "Missing pitch for note")
 
@@ -1057,7 +1060,7 @@ class IntentLayer:
         path = args[0]
 
         try:
-            from fcp_midi.serialization import deserialize
+            from fcp_midi.serialization.deserialize import deserialize
             self.song = deserialize(path)
             self.event_log = EventLog()
             self.registry = Registry()
@@ -1088,7 +1091,7 @@ class IntentLayer:
             return format_result(False, "No file path set", 'save as:./my-song.mid')
 
         try:
-            from fcp_midi.serialization import serialize
+            from fcp_midi.serialization.serialize import serialize
             serialize(self.song, self.song.file_path)
             return format_result(True, f"Saved to '{self.song.file_path}'")
         except ImportError:
