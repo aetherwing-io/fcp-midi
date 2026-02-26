@@ -68,8 +68,9 @@ class TestTrackOps:
         assert track.program == 0
 
     def test_add_track_with_channel(self, intent_with_song: IntentLayer) -> None:
+        # ch:10 = MIDI channel 10 (1-indexed) = channel 9 (0-indexed, drums)
         results = intent_with_song.execute_ops(
-            ["track add Drums instrument:standard-kit ch:9"]
+            ["track add Drums instrument:standard-kit ch:10"]
         )
         assert any("+" in r for r in results)
         track = intent_with_song.song.get_track_by_name("Drums")

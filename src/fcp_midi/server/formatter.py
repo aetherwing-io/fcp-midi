@@ -47,8 +47,9 @@ def format_track_list(song: Song) -> str:
             flags += " [MUTED]"
         if track.solo:
             flags += " [SOLO]"
+        display_ch = track.channel + 1  # 1-indexed for display
         lines.append(
-            f"  {idx}. {track.name} (ch:{track.channel}) "
+            f"  {idx}. {track.name} (ch:{display_ch}) "
             f"{inst} | {n_notes} notes, {n_cc} cc, {n_pb} bend{flags}"
         )
     header = f"Tracks ({len(lines)}):"
@@ -160,7 +161,7 @@ def format_describe(track: Track, song: Song) -> str:
 
     lines = [
         f"Track: {track.name}",
-        f"  Channel: {track.channel}",
+        f"  Channel: {track.channel + 1}",
         f"  Instrument: {inst} (program:{prog})",
         f"  Notes: {n_notes}",
         f"  CCs: {len(track.control_changes)}",
@@ -305,7 +306,8 @@ def format_map(song: Song) -> str:
                 flags += " [M]"
             if track.solo:
                 flags += " [S]"
-            lines.append(f"    {idx}. {track.name} ch:{track.channel} {inst} ({n_notes} notes){flags}")
+            display_ch = track.channel + 1  # 1-indexed for display
+            lines.append(f"    {idx}. {track.name} ch:{display_ch} {inst} ({n_notes} notes){flags}")
     else:
         lines.append("  No tracks.")
 

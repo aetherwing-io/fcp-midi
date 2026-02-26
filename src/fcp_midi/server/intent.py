@@ -212,7 +212,7 @@ class IntentLayer:
         except ValueError as e:
             return format_result(False, f"Invalid velocity: {e}")
 
-        ch = int(op.params["ch"]) if "ch" in op.params else None
+        ch = int(op.params["ch"]) - 1 if "ch" in op.params else None
 
         note = self.song.add_note(track.id, pitch, tick, dur, vel, ch)
         self.event_log.append(NoteAdded(track_id=track.id, note_id=note.id))
@@ -257,7 +257,7 @@ class IntentLayer:
         except ValueError as e:
             return format_result(False, f"Invalid velocity: {e}")
 
-        ch = int(op.params["ch"]) if "ch" in op.params else None
+        ch = int(op.params["ch"]) - 1 if "ch" in op.params else None
 
         for pitch in pitches:
             note = self.song.add_note(track.id, pitch, tick, dur, vel, ch)
@@ -283,12 +283,24 @@ class IntentLayer:
 
             inst_name = op.params.get("instrument")
             program = None
+            is_drum_kit = False
             if inst_name:
+                normalized = inst_name.strip().lower().replace(" ", "-")
+                is_drum_kit = normalized in (
+                    "standard-kit", "drum-kit", "drums", "percussion",
+                )
                 program = instrument_to_program(inst_name)
-                if program is None:
+                if program is None and not is_drum_kit:
                     return format_result(False, f"Unknown instrument: {inst_name!r}")
+                if is_drum_kit:
+                    program = 0  # GM standard kit
 
-            ch = int(op.params["ch"]) if "ch" in op.params else None
+            # ch: param is 1-indexed (MIDI convention), convert to 0-indexed
+            ch = int(op.params["ch"]) - 1 if "ch" in op.params else None
+
+            # Force drum channel when instrument is a drum kit
+            if is_drum_kit and ch is None:
+                ch = 9
 
             track = self.song.add_track(
                 name=name,
@@ -300,7 +312,8 @@ class IntentLayer:
             self.registry.rebuild(self.song)
 
             inst_display = inst_name or "no instrument"
-            return format_result(True, f"Track '{name}' added (ch:{track.channel}, {inst_display})")
+            display_ch = track.channel + 1  # display 1-indexed for users
+            return format_result(True, f"Track '{name}' added (ch:{display_ch}, {inst_display})")
 
         elif sub == "remove":
             name = op.params.get("name")
@@ -346,7 +359,7 @@ class IntentLayer:
         except ValueError as e:
             return format_result(False, f"Invalid position: {e}")
 
-        ch = int(op.params["ch"]) if "ch" in op.params else None
+        ch = int(op.params["ch"]) - 1 if "ch" in op.params else None
 
         cc = self.song.add_cc(track.id, cc_num, cc_val, tick, ch)
         self.event_log.append(CCAdded(track_id=track.id, cc_id=cc.id))
@@ -379,7 +392,7 @@ class IntentLayer:
         except ValueError as e:
             return format_result(False, f"Invalid position: {e}")
 
-        ch = int(op.params["ch"]) if "ch" in op.params else None
+        ch = int(op.params["ch"]) - 1 if "ch" in op.params else None
 
         pb = self.song.add_pitch_bend(track.id, value, tick, ch)
         self.event_log.append(PitchBendAdded(track_id=track.id, pb_id=pb.id))
