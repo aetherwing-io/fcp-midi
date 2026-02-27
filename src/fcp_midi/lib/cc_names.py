@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from fcp_midi.errors import ValidationError
+
 # fmt: off
 CC_NAMES: dict[str, int] = {
     "modulation":      1,
@@ -68,7 +70,7 @@ def parse_cc_value(name: str, value_str: str) -> tuple[int, int]:
     """
     cc_num = cc_to_number(name)
     if cc_num is None:
-        raise ValueError(f"Unknown CC name: {name!r}")
+        raise ValidationError(f"Unknown CC name: {name!r}")
 
     val_lower = value_str.strip().lower()
     if val_lower == "on":
@@ -79,9 +81,9 @@ def parse_cc_value(name: str, value_str: str) -> tuple[int, int]:
     try:
         val = int(val_lower)
     except ValueError:
-        raise ValueError(f"Invalid CC value: {value_str!r}") from None
+        raise ValidationError(f"Invalid CC value: {value_str!r}") from None
 
     if not 0 <= val <= 127:
-        raise ValueError(f"CC value out of range (0-127): {val}")
+        raise ValidationError(f"CC value out of range (0-127): {val}")
 
     return (cc_num, val)

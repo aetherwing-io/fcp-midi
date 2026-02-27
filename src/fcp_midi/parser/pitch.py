@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import re
 
+from fcp_midi.errors import ValidationError
 from fcp_midi.model.song import Pitch
 
 # Semitone offsets for natural notes (C-based)
@@ -77,9 +78,9 @@ def parse_pitch(s: str) -> Pitch:
         try:
             midi_number = int(s[5:])
         except ValueError:
-            raise ValueError(f"Invalid MIDI number in '{s}'")
+            raise ValidationError(f"Invalid MIDI number in '{s}'")
         if midi_number < 0 or midi_number > 127:
-            raise ValueError(
+            raise ValidationError(
                 f"MIDI number {midi_number} out of range (0-127)"
             )
         return _pitch_from_midi(midi_number)
@@ -87,7 +88,7 @@ def parse_pitch(s: str) -> Pitch:
     # Handle note-name format
     m = _PITCH_RE.match(s)
     if not m:
-        raise ValueError(f"Cannot parse pitch: '{s}'")
+        raise ValidationError(f"Cannot parse pitch: '{s}'")
 
     name = m.group(1).upper()
     accidental = m.group(2) or ""
@@ -95,15 +96,15 @@ def parse_pitch(s: str) -> Pitch:
 
     note_offset = _NOTE_OFFSETS.get(name)
     if note_offset is None:
-        raise ValueError(f"Invalid note name: '{name}'")
+        raise ValidationError(f"Invalid note name: '{name}'")
     acc_offset = _ACCIDENTAL_OFFSETS.get(accidental)
     if acc_offset is None:
-        raise ValueError(f"Invalid accidental: '{accidental}'")
+        raise ValidationError(f"Invalid accidental: '{accidental}'")
 
     midi_number = (octave + 1) * 12 + note_offset + acc_offset
 
     if midi_number < 0 or midi_number > 127:
-        raise ValueError(
+        raise ValidationError(
             f"Computed MIDI number {midi_number} out of range (0-127) "
             f"for pitch '{s}'"
         )

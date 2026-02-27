@@ -23,6 +23,7 @@ class Selector:
 
     type: str  # "track", "channel", "range", "pitch", "velocity", "all", "recent"
     value: str  # raw value string
+    negated: bool = False  # True when parsed from @not:type:value
 
 
 def parse_selectors(tokens: list[str]) -> list[Selector]:
@@ -45,12 +46,18 @@ def parse_selectors(tokens: list[str]) -> list[Selector]:
 
         raw = token[1:]  # strip leading @
 
+        # Check for @not:type:value negation prefix
+        negated = False
+        if raw.startswith("not:"):
+            negated = True
+            raw = raw[4:]  # strip "not:"
+
         if ":" in raw:
             sel_type, _, sel_value = raw.partition(":")
         else:
             sel_type = raw
             sel_value = ""
 
-        selectors.append(Selector(type=sel_type, value=sel_value))
+        selectors.append(Selector(type=sel_type, value=sel_value, negated=negated))
 
     return selectors

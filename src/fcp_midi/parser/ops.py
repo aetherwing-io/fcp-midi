@@ -39,6 +39,10 @@ _SELECTOR_VERBS = {
     "transpose",
     "velocity",
     "quantize",
+    "modify",
+    "repeat",
+    "crescendo",
+    "decrescendo",
 }
 
 # Verbs that take a track name as first positional arg

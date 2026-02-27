@@ -6,6 +6,8 @@ and raw tick values.
 
 from __future__ import annotations
 
+from fcp_midi.errors import ValidationError
+
 
 # Base duration names → multiplier relative to a whole note (4 beats)
 # At ppqn=480: whole=1920, half=960, quarter=480, etc.
@@ -61,7 +63,7 @@ def parse_duration(s: str, ppqn: int = 480) -> int:
         try:
             return int(s[6:])
         except ValueError:
-            raise ValueError(f"Invalid tick value in '{s}'")
+            raise ValidationError(f"Invalid tick value in '{s}'")
 
     # Resolve aliases
     base_name = s
@@ -81,7 +83,7 @@ def parse_duration(s: str, ppqn: int = 480) -> int:
 
     multiplier = _DURATION_NAMES.get(base_name)
     if multiplier is None:
-        raise ValueError(f"Unknown duration: '{s}'")
+        raise ValidationError(f"Unknown duration: '{s}'")
 
     # Base ticks = multiplier * ppqn (since quarter = 1.0 * ppqn)
     ticks = multiplier * ppqn

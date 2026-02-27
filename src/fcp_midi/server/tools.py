@@ -1,19 +1,32 @@
-"""FastMCP tool registrations for MIDI FCP."""
+"""FastMCP tool registrations for MIDI FCP.
+
+This module is a compatibility shim. Tool registration is now handled
+by ``create_fcp_server()`` from fcp_core via the adapter pattern.
+The ``register_tools()`` function is kept for backward compatibility.
+"""
 
 from __future__ import annotations
 
 from fastmcp import FastMCP
 
 from fcp_midi.server.intent import IntentLayer
+from fcp_midi.server.reference_card import build_tool_description
 
 
 def register_tools(mcp: FastMCP, intent: IntentLayer) -> None:
-    """Register the 4 MIDI FCP tools on the given MCP server."""
+    """Register the 4 MIDI FCP tools on the given MCP server.
 
-    @mcp.tool
+    .. deprecated::
+        Use ``create_fcp_server()`` from ``fcp_core`` with ``MidiAdapter``
+        instead. This function is kept for backward compatibility.
+    """
+
+    # Build the full reference card into the midi tool description
+    # so the LLM sees it on connect — no extra midi_help() call needed.
+    midi_description = build_tool_description()
+
+    @mcp.tool(description=midi_description)
     def midi(ops: list[str]) -> str:
-        """Execute MIDI operations. Each op: VERB TARGET [key:value ...]
-        Call midi_help for the full reference card."""
         results = intent.execute_ops(ops)
         return "\n".join(results)
 
@@ -32,6 +45,7 @@ def register_tools(mcp: FastMCP, intent: IntentLayer) -> None:
 
     @mcp.tool
     def midi_help() -> str:
-        """Returns the MIDI FCP reference card with all syntax."""
+        """Returns the MIDI FCP reference card with all syntax.
+        Use after context truncation or when custom types have been defined."""
         from fcp_midi.server.reference_card import REFERENCE_CARD
         return REFERENCE_CARD

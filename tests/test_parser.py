@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from fcp_midi.errors import ValidationError
 from fcp_midi.model.song import Pitch, TimeSignature
 from fcp_midi.parser.tokenizer import is_key_value, parse_key_value, tokenize
 from fcp_midi.parser.pitch import parse_pitch
@@ -40,6 +41,11 @@ class TestTokenize:
         result = tokenize("remove @track:Piano @range:1.1-2.1")
         assert "@track:Piano" in result
         assert "@range:1.1-2.1" in result
+
+    def test_sharp_pitch_not_treated_as_comment(self):
+        """Regression: shlex treated # as comment, eating C#4 and everything after."""
+        result = tokenize("note Piano C#4 at:1.1 dur:quarter")
+        assert result == ["note", "Piano", "C#4", "at:1.1", "dur:quarter"]
 
     def test_empty_string(self):
         assert tokenize("") == []
@@ -146,15 +152,15 @@ class TestParsePitch:
         assert p.midi_number == 0
 
     def test_invalid_pitch(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             parse_pitch("X4")
 
     def test_invalid_midi(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             parse_pitch("midi:200")
 
     def test_no_octave(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             parse_pitch("C")
 
     def test_lowercase_note(self):
@@ -238,11 +244,11 @@ class TestParseDuration:
         assert parse_duration("whole", ppqn=960) == 3840
 
     def test_unknown_duration(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             parse_duration("bogus")
 
     def test_invalid_ticks(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             parse_duration("ticks:abc")
 
     def test_dotted_alias(self):
@@ -308,21 +314,48 @@ class TestParsePosition:
         assert parse_position("3.1", time_sigs=ts) == 3840
 
     def test_invalid_format(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             parse_position("abc")
 
     def test_measure_zero(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             parse_position("0.1")
 
     def test_beat_zero(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             parse_position("1.0")
 
     def test_no_time_sigs_defaults_to_4_4(self):
         # Should work the same as 4/4
         assert parse_position("2.1", time_sigs=None) == 1920
         assert parse_position("2.1", time_sigs=[]) == 1920
+
+    def test_relative_plus_quarter(self):
+        # +quarter from tick 480 = 480 + 480 = 960
+        assert parse_position("+quarter", ppqn=480, reference_tick=480) == 960
+
+    def test_relative_minus_eighth(self):
+        # -eighth from tick 960 = 960 - 240 = 720
+        assert parse_position("-eighth", ppqn=480, reference_tick=960) == 720
+
+    def test_relative_end(self):
+        assert parse_position("end", song_end_tick=3840) == 3840
+
+    def test_relative_plus_no_reference_raises(self):
+        with pytest.raises(ValueError, match="Relative position requires reference"):
+            parse_position("+quarter", ppqn=480)
+
+    def test_end_no_song_context_raises(self):
+        with pytest.raises(ValueError, match="'end' requires song context"):
+            parse_position("end")
+
+    def test_relative_plus_half(self):
+        # +half from tick 0 = 0 + 960 = 960
+        assert parse_position("+half", ppqn=480, reference_tick=0) == 960
+
+    def test_relative_minus_clamps_to_zero(self):
+        # -whole from tick 100 would be negative, clamps to 0
+        assert parse_position("-whole", ppqn=480, reference_tick=100) == 0
 
 
 # =========================================================================
@@ -463,11 +496,11 @@ class TestParseChord:
         assert midi_numbers == [70, 74, 77]
 
     def test_invalid_root(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             parse_chord("Xmaj")
 
     def test_unknown_quality(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             parse_chord("Cxyz")
 
 
@@ -525,6 +558,32 @@ class TestParseSelectors:
         result = parse_selectors(["remove", "@all", "at:1.1"])
         assert len(result) == 1
         assert result[0].type == "all"
+
+    def test_not_pitch_selector(self):
+        result = parse_selectors(["@not:pitch:C4"])
+        assert len(result) == 1
+        assert result[0].type == "pitch"
+        assert result[0].value == "C4"
+        assert result[0].negated is True
+
+    def test_not_track_selector(self):
+        result = parse_selectors(["@not:track:Piano"])
+        assert len(result) == 1
+        assert result[0].type == "track"
+        assert result[0].value == "Piano"
+        assert result[0].negated is True
+
+    def test_mixed_positive_and_negated(self):
+        result = parse_selectors(["@track:Piano", "@not:pitch:C4"])
+        assert len(result) == 2
+        assert result[0].negated is False
+        assert result[1].negated is True
+        assert result[1].type == "pitch"
+        assert result[1].value == "C4"
+
+    def test_positive_selectors_not_negated(self):
+        result = parse_selectors(["@track:Piano", "@range:1.1-4.4"])
+        assert all(not s.negated for s in result)
 
 
 # =========================================================================

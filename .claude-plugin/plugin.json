@@ -1,0 +1,9 @@
+{
+  "name": "fcp-midi",
+  "description": "MCP server for semantic MIDI music composition",
+  "version": "0.1.0",
+  "license": "MIT",
+  "author": "Scott Meyer",
+  "repository": "https://github.com/aetherwing-io/fcp-midi",
+  "keywords": ["midi", "music", "composition", "mcp"]
+}

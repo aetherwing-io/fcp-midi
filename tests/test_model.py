@@ -362,3 +362,121 @@ class TestEventLogRecent:
         e1 = NoteAdded(track_id="t1", note_id="n1")
         log.append(e1)
         assert log.recent(10) == [e1]
+
+
+# ---------------------------------------------------------------------------
+# Registry incremental methods
+# ---------------------------------------------------------------------------
+
+from fcp_midi.model.registry import Registry
+
+
+def _song_with_notes():
+    """Create a song with 2 tracks and a few notes for registry tests."""
+    s = Song.create(title="RegTest", tempo=120.0, time_sig=(4, 4))
+    piano = s.add_track("Piano")
+    bass = s.add_track("Bass")
+    n1 = s.add_note(piano.id, _c4(), absolute_tick=0, duration_ticks=480, velocity=80)
+    n2 = s.add_note(piano.id, _d4(), absolute_tick=480, duration_ticks=480, velocity=90)
+    n3 = s.add_note(bass.id, _c4(), absolute_tick=0, duration_ticks=960, velocity=100)
+    return s, piano, bass, n1, n2, n3
+
+
+class TestRegistryAddNote:
+    def test_add_note_indexes_correctly(self):
+        s, piano, bass, n1, n2, n3 = _song_with_notes()
+        reg = Registry()
+        reg.add_note(n1, "Piano")
+        assert len(reg.by_track("Piano")) == 1
+        assert len(reg.by_pitch(60)) == 1
+        assert reg.by_track("Piano")[0].id == n1.id
+
+    def test_add_multiple_notes(self):
+        s, piano, bass, n1, n2, n3 = _song_with_notes()
+        reg = Registry()
+        reg.add_note(n1, "Piano")
+        reg.add_note(n2, "Piano")
+        reg.add_note(n3, "Bass")
+        assert len(reg.by_track("Piano")) == 2
+        assert len(reg.by_track("Bass")) == 1
+        assert len(reg.by_pitch(60)) == 2  # n1 (C4) + n3 (C4)
+        assert len(reg.by_pitch(62)) == 1  # n2 (D4)
+
+
+class TestRegistryRemoveNote:
+    def test_remove_note(self):
+        s, piano, bass, n1, n2, n3 = _song_with_notes()
+        reg = Registry()
+        reg.rebuild(s)
+        assert len(reg.by_track("Piano")) == 2
+
+        reg.remove_note(n1, "Piano")
+        assert len(reg.by_track("Piano")) == 1
+        assert reg.by_track("Piano")[0].id == n2.id
+        assert len(reg.by_pitch(60)) == 1  # only n3 remains
+
+    def test_remove_all_from_track(self):
+        s, piano, bass, n1, n2, n3 = _song_with_notes()
+        reg = Registry()
+        reg.rebuild(s)
+        reg.remove_note(n1, "Piano")
+        reg.remove_note(n2, "Piano")
+        assert len(reg.by_track("Piano")) == 0
+
+
+class TestRegistryUpdateNote:
+    def test_update_pitch(self):
+        s, piano, bass, n1, n2, n3 = _song_with_notes()
+        reg = Registry()
+        reg.rebuild(s)
+        assert len(reg.by_pitch(60)) == 2  # n1 + n3
+
+        old_pitch = n1.pitch
+        new_pitch = Pitch(name="E", accidental="", octave=4, midi_number=64)
+        n1.pitch = new_pitch
+        reg.update_note(n1, "Piano", "pitch", old_pitch)
+
+        assert len(reg.by_pitch(60)) == 1  # only n3
+        assert len(reg.by_pitch(64)) == 1  # n1 moved here
+
+    def test_update_channel(self):
+        s, piano, bass, n1, n2, n3 = _song_with_notes()
+        reg = Registry()
+        reg.rebuild(s)
+        old_ch = n1.channel
+        n1.channel = 5
+        reg.update_note(n1, "Piano", "channel", old_ch)
+        assert len(reg.by_channel(5)) == 1
+
+    def test_update_velocity_is_noop(self):
+        """Velocity changes don't affect indexes."""
+        s, piano, bass, n1, n2, n3 = _song_with_notes()
+        reg = Registry()
+        reg.rebuild(s)
+        old_vel = n1.velocity
+        n1.velocity = 127
+        reg.update_note(n1, "Piano", "velocity", old_vel)
+        # Should not error; indexes unchanged
+        assert len(reg.by_track("Piano")) == 2
+
+
+class TestRegistryIncrementalConsistency:
+    def test_incremental_matches_rebuild(self):
+        """Build registry incrementally and verify it matches a full rebuild."""
+        s, piano, bass, n1, n2, n3 = _song_with_notes()
+
+        # Incremental build
+        inc = Registry()
+        inc.add_note(n1, "Piano")
+        inc.add_note(n2, "Piano")
+        inc.add_note(n3, "Bass")
+
+        # Full rebuild
+        full = Registry()
+        full.rebuild(s)
+
+        # Compare
+        assert set(n.id for n in inc.by_track("Piano")) == set(n.id for n in full.by_track("Piano"))
+        assert set(n.id for n in inc.by_track("Bass")) == set(n.id for n in full.by_track("Bass"))
+        assert set(n.id for n in inc.by_pitch(60)) == set(n.id for n in full.by_pitch(60))
+        assert set(n.id for n in inc.by_pitch(62)) == set(n.id for n in full.by_pitch(62))

@@ -42,6 +42,11 @@ def format_track_list(song: Song) -> str:
         n_cc = len(track.control_changes)
         n_pb = len(track.pitch_bends)
         inst = track.instrument or "no instrument"
+        bank_info = ""
+        if track.bank_msb is not None or track.bank_lsb is not None:
+            msb = track.bank_msb if track.bank_msb is not None else 0
+            lsb = track.bank_lsb if track.bank_lsb is not None else 0
+            bank_info = f" bank:{msb}.{lsb}"
         flags = ""
         if track.mute:
             flags += " [MUTED]"
@@ -50,7 +55,7 @@ def format_track_list(song: Song) -> str:
         display_ch = track.channel + 1  # 1-indexed for display
         lines.append(
             f"  {idx}. {track.name} (ch:{display_ch}) "
-            f"{inst} | {n_notes} notes, {n_cc} cc, {n_pb} bend{flags}"
+            f"{inst}{bank_info} | {n_notes} notes, {n_cc} cc, {n_pb} bend{flags}"
         )
     header = f"Tracks ({len(lines)}):"
     return "\n".join([header] + lines)
@@ -63,6 +68,13 @@ def format_events(
     end_tick: int | None = None,
 ) -> str:
     """Format events on a track within an optional tick range."""
+    # Make end inclusive: add one beat so events AT the end beat are included
+    if end_tick is not None:
+        from fcp_midi.parser.position import _ticks_per_beat
+        ts = song.time_signatures[0] if song.time_signatures else None
+        denom = ts.denominator if ts else 4
+        end_tick += _ticks_per_beat(denom, song.ppqn)
+
     lines: list[str] = []
 
     # Collect and sort notes
@@ -159,10 +171,16 @@ def format_describe(track: Track, song: Song) -> str:
     inst = track.instrument or "none"
     prog = track.program if track.program is not None else "none"
 
+    bank_str = ""
+    if track.bank_msb is not None or track.bank_lsb is not None:
+        msb = track.bank_msb if track.bank_msb is not None else 0
+        lsb = track.bank_lsb if track.bank_lsb is not None else 0
+        bank_str = f" bank:{msb}.{lsb}"
+
     lines = [
         f"Track: {track.name}",
         f"  Channel: {track.channel + 1}",
-        f"  Instrument: {inst} (program:{prog})",
+        f"  Instrument: {inst} (program:{prog}){bank_str}",
         f"  Notes: {n_notes}",
         f"  CCs: {len(track.control_changes)}",
         f"  Pitch bends: {len(track.pitch_bends)}",

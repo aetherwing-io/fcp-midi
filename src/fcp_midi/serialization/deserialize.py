@@ -167,6 +167,13 @@ def pretty_midi_to_song(pm: pretty_midi.PrettyMIDI) -> Song:
             program=inst.program,
         )
 
+        # Detect bank select CCs (earliest CC#0 and CC#32)
+        for cc in inst.control_changes:
+            if cc.number == 0 and track.bank_msb is None:
+                track.bank_msb = cc.value
+            elif cc.number == 32 and track.bank_lsb is None:
+                track.bank_lsb = cc.value
+
         # Notes
         for n in inst.notes:
             nid = _id()

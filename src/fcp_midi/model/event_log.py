@@ -1,14 +1,19 @@
 """Event log with undo/redo and named checkpoints.
 
-Events form a tagged union via a ``type`` string discriminant on each
-dataclass.  The log is cursor-based: ``cursor`` always points one past
-the last *applied* event.  Appending a new event when cursor < len
-truncates the redo tail.
+Domain event types are defined here (tagged union via ``type`` discriminant).
+The EventLog class wraps ``fcp_core.EventLog`` with domain-specific
+behaviour (KeyError on missing checkpoint, ``.events`` property).
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
+
+from fcp_core import EventLog as _CoreEventLog
+
+if TYPE_CHECKING:
+    from fcp_midi.model.song import ControlChange, Note, PitchBend, Track
 
 
 # ---------------------------------------------------------------------------
@@ -20,6 +25,7 @@ class NoteAdded:
     type: str = field(default="note_added", init=False)
     track_id: str = ""
     note_id: str = ""
+    note_snapshot: Note | None = None
 
 
 @dataclass
@@ -27,6 +33,7 @@ class NoteRemoved:
     type: str = field(default="note_removed", init=False)
     track_id: str = ""
     note_id: str = ""
+    note_snapshot: Note | None = None
 
 
 @dataclass
@@ -43,12 +50,14 @@ class NoteModified:
 class TrackAdded:
     type: str = field(default="track_added", init=False)
     track_id: str = ""
+    track_snapshot: Track | None = None
 
 
 @dataclass
 class TrackRemoved:
     type: str = field(default="track_removed", init=False)
     track_id: str = ""
+    track_snapshot: Track | None = None
 
 
 @dataclass
@@ -64,6 +73,7 @@ class CCAdded:
     type: str = field(default="cc_added", init=False)
     track_id: str = ""
     cc_id: str = ""
+    cc_snapshot: ControlChange | None = None
 
 
 @dataclass
@@ -71,6 +81,7 @@ class PitchBendAdded:
     type: str = field(default="pitch_bend_added", init=False)
     track_id: str = ""
     pb_id: str = ""
+    pb_snapshot: PitchBend | None = None
 
 
 @dataclass
@@ -134,108 +145,70 @@ Event = (
 
 
 # ---------------------------------------------------------------------------
-# EventLog
+# EventLog — wraps fcp_core.EventLog with domain compatibility
 # ---------------------------------------------------------------------------
 
 class EventLog:
-    """Linear event log with cursor-based undo/redo and named checkpoints."""
+    """Linear event log with cursor-based undo/redo and named checkpoints.
+
+    Wraps ``fcp_core.EventLog`` and adds:
+    - ``.events`` property returning the full event list up to cursor
+    - ``undo_to()`` raises ``KeyError`` on missing checkpoint (vs returning None)
+    """
 
     def __init__(self) -> None:
+        self._core = _CoreEventLog()
+        # Keep a parallel list for the .events property since the core
+        # EventLog doesn't expose its internal list.
         self._events: list[Event] = []
-        self._cursor: int = 0  # points past last applied event
-        self._checkpoints: dict[str, int] = {}
-
-    # -- properties ----------------------------------------------------------
 
     @property
     def cursor(self) -> int:
-        return self._cursor
+        return self._core.cursor
 
     @property
     def events(self) -> list[Event]:
-        return list(self._events)
-
-    # -- mutation ------------------------------------------------------------
+        return list(self._events[:self._core.cursor])
 
     def append(self, event: Event) -> None:
         """Add *event* at cursor position, truncating any redo tail."""
-        # Truncate redo history
-        if self._cursor < len(self._events):
-            self._events = self._events[: self._cursor]
-            # Invalidate checkpoints beyond the new end
-            self._checkpoints = {
-                name: pos
-                for name, pos in self._checkpoints.items()
-                if pos <= self._cursor
-            }
+        cursor = self._core.cursor
+        if cursor < len(self._events):
+            self._events = self._events[:cursor]
         self._events.append(event)
-        self._cursor += 1
+        self._core.append(event)
 
     def checkpoint(self, name: str) -> None:
         """Record the current cursor position under *name* and append a
         ``CheckpointEvent`` so the log is self-describing."""
-        self._checkpoints[name] = self._cursor
-        self.append(CheckpointEvent(name=name))
-
-    # -- undo / redo ---------------------------------------------------------
+        cp_event = CheckpointEvent(name=name)
+        cursor = self._core.cursor
+        if cursor < len(self._events):
+            self._events = self._events[:cursor]
+        self._events.append(cp_event)
+        self._core.checkpoint(name)
 
     def undo(self, count: int = 1) -> list[Event]:
         """Move cursor back by *count* applied events (skipping checkpoints)
         and return the events that should be reversed, most-recent-first."""
-        reversed_events: list[Event] = []
-        remaining = count
-        while remaining > 0 and self._cursor > 0:
-            self._cursor -= 1
-            ev = self._events[self._cursor]
-            if isinstance(ev, CheckpointEvent):
-                # skip checkpoint sentinels — they don't count
-                continue
-            reversed_events.append(ev)
-            remaining -= 1
-        return reversed_events
+        return self._core.undo(count)
 
     def undo_to(self, name: str) -> list[Event]:
         """Undo back to the named checkpoint, returning events most-recent-first.
 
-        The cursor lands at the checkpoint position (i.e. the checkpoint's
-        ``CheckpointEvent`` itself is *not* undone).
+        Raises ``KeyError`` if the checkpoint is not found.
         """
-        target = self._checkpoints.get(name)
-        if target is None:
+        result = self._core.undo_to(name)
+        if result is None:
             raise KeyError(f"No checkpoint named {name!r}")
-        reversed_events: list[Event] = []
-        while self._cursor > target:
-            self._cursor -= 1
-            ev = self._events[self._cursor]
-            if not isinstance(ev, CheckpointEvent):
-                reversed_events.append(ev)
-        return reversed_events
+        return result
 
     def redo(self, count: int = 1) -> list[Event]:
         """Replay up to *count* events forward from cursor (skipping
-        checkpoint sentinels).  Returns events in forward order."""
-        replayed: list[Event] = []
-        remaining = count
-        while remaining > 0 and self._cursor < len(self._events):
-            ev = self._events[self._cursor]
-            self._cursor += 1
-            if isinstance(ev, CheckpointEvent):
-                continue
-            replayed.append(ev)
-            remaining -= 1
-        return replayed
-
-    # -- queries -------------------------------------------------------------
+        checkpoint sentinels). Returns events in forward order."""
+        return self._core.redo(count)
 
     def recent(self, count: int = 5) -> list[Event]:
         """Return the last *count* non-checkpoint events up to the cursor,
         in chronological (oldest-first) order."""
-        result: list[Event] = []
-        idx = self._cursor - 1
-        while len(result) < count and idx >= 0:
-            ev = self._events[idx]
-            if not isinstance(ev, CheckpointEvent):
-                result.append(ev)
-            idx -= 1
-        result.reverse()
-        return result
+        return self._core.recent(count)

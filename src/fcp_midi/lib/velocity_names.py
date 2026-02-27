@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from fcp_midi.errors import ValidationError
+
 VELOCITY_NAMES: dict[str, int] = {
     "ppp": 16,
     "pp": 33,
@@ -34,9 +36,9 @@ def parse_velocity(s: str) -> int:
     try:
         val = int(stripped)
     except ValueError:
-        raise ValueError(f"Unknown velocity: {s!r}") from None
+        raise ValidationError(f"Unknown velocity: {s!r}") from None
 
     if not 0 <= val <= 127:
-        raise ValueError(f"Velocity out of range (0-127): {val}")
+        raise ValidationError(f"Velocity out of range (0-127): {val}")
 
     return val

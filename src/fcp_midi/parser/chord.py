@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import re
 
+from fcp_midi.errors import ValidationError
 from fcp_midi.model.song import Pitch
 from fcp_midi.parser.pitch import _NOTE_OFFSETS, _MIDI_TO_NOTE
 
@@ -102,7 +103,7 @@ def parse_chord(s: str, octave: int = 4) -> list[Pitch]:
     if slash_bass is not None:
         bass_name, bass_accidental, bass_remainder = _extract_root(slash_bass)
         if bass_remainder:
-            raise ValueError(f"Invalid bass note in slash chord: '{slash_bass}'")
+            raise ValidationError(f"Invalid bass note in slash chord: '{slash_bass}'")
         bass_semitone = _ROOT_TO_SEMITONE[bass_name + bass_accidental]
         # Place bass note below the root
         bass_midi = (octave + 1) * 12 + bass_semitone
@@ -120,11 +121,11 @@ def parse_chord(s: str, octave: int = 4) -> list[Pitch]:
 def _extract_root(s: str) -> tuple[str, str, str]:
     """Extract root note name, accidental, and the remaining quality string."""
     if len(s) < 1:
-        raise ValueError("Empty chord string")
+        raise ValidationError("Empty chord string")
 
     name = s[0].upper()
     if name not in _NOTE_OFFSETS:
-        raise ValueError(f"Invalid root note: '{s[0]}'")
+        raise ValidationError(f"Invalid root note: '{s[0]}'")
 
     pos = 1
     accidental = ""
@@ -155,7 +156,7 @@ def _match_quality(remainder: str) -> str:
     if remainder in ("minor", "amin"):
         return "min"
 
-    raise ValueError(f"Unknown chord quality: '{remainder}'")
+    raise ValidationError(f"Unknown chord quality: '{remainder}'")
 
 
 def _pitch_from_midi(midi_number: int) -> Pitch:

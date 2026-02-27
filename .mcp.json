@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "fcp-midi": {
+      "command": "uv",
+      "args": ["run", "python", "-m", "fcp_midi"],
+      "cwd": "."
+    }
+  }
+}

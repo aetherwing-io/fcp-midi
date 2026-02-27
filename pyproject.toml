@@ -2,17 +2,23 @@
 name = "fcp-midi"
 version = "0.1.0"
 description = "MIDI File Context Protocol — semantic MIDI composition for LLMs"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.14"
 dependencies = [
+    "fcp-core>=0.1.0",
     "fastmcp>=3.0",
     "pretty-midi>=0.2.10",
 ]
+
+# [tool.uv.sources]
+# For local development, uncomment below:
+# fcp-core = { path = "../fcp-core/python", editable = true }
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
     "ruff>=0.4",
     "pyright>=1.1",
+    "sf2utils>=1.0.0",
 ]
 
 [build-system]
@@ -24,6 +30,7 @@ packages = ["src/fcp_midi"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["slow: marks tests as slow (deselect with '-m \"not slow\"')"]
 
 [tool.ruff]
 src = ["src"]

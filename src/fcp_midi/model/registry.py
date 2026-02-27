@@ -40,6 +40,50 @@ class Registry:
                 self._by_pitch[note.pitch.midi_number].append(note)
                 self._by_channel[note.channel].append(note)
 
+    # -- incremental updates --------------------------------------------------
+
+    def add_note(self, note: Note, track_name: str) -> None:
+        """Index a single note (after it was added to the song)."""
+        self._all_notes.append(note)
+        self._by_track[track_name].append(note)
+        self._by_pitch[note.pitch.midi_number].append(note)
+        self._by_channel[note.channel].append(note)
+
+    def remove_note(self, note: Note, track_name: str) -> None:
+        """Remove a single note from all indexes."""
+        self._all_notes = [n for n in self._all_notes if n.id != note.id]
+        self._by_track[track_name] = [
+            n for n in self._by_track[track_name] if n.id != note.id
+        ]
+        self._by_pitch[note.pitch.midi_number] = [
+            n for n in self._by_pitch[note.pitch.midi_number] if n.id != note.id
+        ]
+        self._by_channel[note.channel] = [
+            n for n in self._by_channel[note.channel] if n.id != note.id
+        ]
+
+    def update_note(
+        self, note: Note, track_name: str, changed_field: str, old_value: object
+    ) -> None:
+        """Re-index a note after a field change.
+
+        Only ``pitch`` and ``channel`` changes require re-indexing.
+        Other field changes (velocity, absolute_tick, duration_ticks)
+        don't affect indexed lookups.
+        """
+        if changed_field == "pitch":
+            old_midi = old_value.midi_number  # type: ignore[union-attr]
+            self._by_pitch[old_midi] = [
+                n for n in self._by_pitch[old_midi] if n.id != note.id
+            ]
+            self._by_pitch[note.pitch.midi_number].append(note)
+        elif changed_field == "channel":
+            old_ch = int(old_value)  # type: ignore[arg-type]
+            self._by_channel[old_ch] = [
+                n for n in self._by_channel[old_ch] if n.id != note.id
+            ]
+            self._by_channel[note.channel].append(note)
+
     # -- single-dimension lookups -------------------------------------------
 
     def by_track(self, track_name: str) -> list[Note]:

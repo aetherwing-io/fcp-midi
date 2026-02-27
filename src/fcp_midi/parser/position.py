@@ -8,11 +8,15 @@ from __future__ import annotations
 
 from typing import Any
 
+from fcp_midi.errors import ValidationError
+
 
 def parse_position(
     s: str,
     time_sigs: list[Any] | None = None,
     ppqn: int = 480,
+    reference_tick: int | None = None,
+    song_end_tick: int | None = None,
 ) -> int:
     """Parse a position string and return an absolute tick.
 
@@ -24,6 +28,9 @@ def parse_position(
         - ``"M.B"`` — measure.beat (1-based). ``"1.1"`` = tick 0.
         - ``"M.B.T"`` — with tick subdivision. ``"2.1.120"`` = tick 2040.
         - ``"tick:N"`` — raw absolute tick.
+        - ``"+DUR"`` — relative: reference_tick + duration.
+        - ``"-DUR"`` — relative: reference_tick - duration.
+        - ``"end"`` — song end (last note end tick).
 
     time_sigs : list
         List of ``TimeSignature`` objects (or anything with ``.absolute_tick``,
@@ -31,6 +38,10 @@ def parse_position(
         Defaults to 4/4 if *None* or empty.
     ppqn : int
         Ticks per quarter note (default 480).
+    reference_tick : int | None
+        Reference tick for relative positions (+DUR / -DUR).
+    song_end_tick : int | None
+        Song end tick for the ``"end"`` keyword.
 
     Returns
     -------
@@ -42,17 +53,40 @@ def parse_position(
     ValueError
         If the position string cannot be parsed.
     """
+    # "end" keyword
+    if s == "end":
+        if song_end_tick is not None:
+            return song_end_tick
+        raise ValidationError("'end' requires song context")
+
+    # Relative positions: +DUR or -DUR
+    if s.startswith("+") or (s.startswith("-") and not s[1:].isdigit() if len(s) > 1 else False):
+        from fcp_midi.parser.duration import parse_duration
+
+        if s.startswith("+"):
+            sign = 1
+            remainder = s[1:]
+        else:
+            sign = -1
+            remainder = s[1:]
+
+        if reference_tick is None:
+            raise ValidationError("Relative position requires reference")
+
+        dur_ticks = parse_duration(remainder, ppqn)
+        return max(0, reference_tick + sign * dur_ticks)
+
     # Raw tick
     if s.startswith("tick:"):
         try:
             return int(s[5:])
         except ValueError:
-            raise ValueError(f"Invalid tick value in '{s}'")
+            raise ValidationError(f"Invalid tick value in '{s}'")
 
     # M.B or M.B.T
     parts = s.split(".")
     if len(parts) < 2 or len(parts) > 3:
-        raise ValueError(
+        raise ValidationError(
             f"Invalid position format: '{s}' (expected M.B or M.B.T)"
         )
 
@@ -61,12 +95,12 @@ def parse_position(
         beat = int(parts[1])
         sub_ticks = int(parts[2]) if len(parts) == 3 else 0
     except ValueError:
-        raise ValueError(f"Non-integer component in position: '{s}'")
+        raise ValidationError(f"Non-integer component in position: '{s}'")
 
     if measure < 1:
-        raise ValueError(f"Measure must be >= 1, got {measure}")
+        raise ValidationError(f"Measure must be >= 1, got {measure}")
     if beat < 1:
-        raise ValueError(f"Beat must be >= 1, got {beat}")
+        raise ValidationError(f"Beat must be >= 1, got {beat}")
 
     # Build effective time-signature map
     ts_list = _normalise_time_sigs(time_sigs, ppqn)

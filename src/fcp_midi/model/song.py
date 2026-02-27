@@ -85,6 +85,8 @@ class Track:
     channel: int  # default channel (0-15)
     instrument: str | None = None  # GM name
     program: int | None = None  # GM number (0-127)
+    bank_msb: int | None = None  # CC#0 Bank Select MSB (0-127)
+    bank_lsb: int | None = None  # CC#32 Bank Select LSB (0-127)
     notes: dict[str, Note] = field(default_factory=dict)
     control_changes: dict[str, ControlChange] = field(default_factory=dict)
     pitch_bends: dict[str, PitchBend] = field(default_factory=dict)
