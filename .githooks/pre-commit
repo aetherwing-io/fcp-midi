@@ -1,0 +1,16 @@
+#!/bin/sh
+# Guard against uncommented local path references in pyproject.toml
+# Use `make link-py` in the root fcp/ directory for local development instead.
+
+if git diff --cached --name-only | grep -q '^pyproject\.toml$'; then
+  if git diff --cached -- pyproject.toml | grep -v '^\+\s*#' | grep -q 'path\s*='; then
+    echo "ERROR: pyproject.toml contains an uncommented local path reference."
+    echo ""
+    echo "  Local path references break CI and anyone cloning this repo."
+    echo "  Use 'make link-py' in the root fcp/ directory for local development."
+    echo ""
+    echo "  To fix: comment out the path line, then run 'make link-py'."
+    echo ""
+    exit 1
+  fi
+fi
