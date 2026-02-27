@@ -33,7 +33,7 @@ midi_session('save as:./voltage_drop.mid')
 
 ### Hero Examples
 
-**Super Mario Bros** -- Classic game theme faithfully recreated: 4 tracks, 288 notes, 16 seconds, 180 BPM.
+**Plumber's Journey** -- Classic game theme faithfully recreated: 4 tracks, 288 notes, 16 seconds, 180 BPM.
 
 **Voltage Drop** -- A drum-and-bass track with tempo acceleration (140 -> 155 -> 174 BPM), 5 tracks, breakbeats, sub-bass, arpeggios, and a signature DROP section. Also used in the FCP vs raw Python agent battle -- FCP produced 1,674 notes across 12 tracks in 87 seconds, compared to 694 notes from ~689 lines of hand-written Python.
 

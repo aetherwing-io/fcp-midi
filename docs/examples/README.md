@@ -1,12 +1,12 @@
 # FCP-MIDI Examples
 
-## Super Mario Bros
+## Plumber's Journey
 
 Classic game theme — a showcase of multi-track MIDI composition.
 
 | Property | Value |
 |----------|-------|
-| File | `super_mario_bros.mid` |
+| File | `plumbers_journey.mid` |
 | Duration | 16.0s |
 | Tracks | 4 |
 | Notes | 288 |
