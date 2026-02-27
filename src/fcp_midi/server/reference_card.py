@@ -173,7 +173,7 @@ def build_tool_description() -> str:
 
     Embeds the full reference card directly in the tool description so the
     LLM sees the complete command set on connect — no extra call needed.
-    Follows the same pattern as drawio-studio-mcp's `studio` tool.
+    Follows the same pattern as fcp-drawio's `drawio` tool.
     """
     lines: list[str] = []
     lines.append(
