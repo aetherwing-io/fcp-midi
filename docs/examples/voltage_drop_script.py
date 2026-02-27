@@ -642,7 +642,7 @@ def create_voltage_drop():
     # =========================================================================
     # SAVE
     # =========================================================================
-    output_path = '/Users/scottmeyer/projects/fcp-midi/tmp/mario/voltage_drop_python.mid'
+    output_path = 'docs/examples/voltage_drop_python.mid'
     mid.save(output_path)
     print(f"Saved: {output_path}")
 
