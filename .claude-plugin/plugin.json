@@ -1,22 +1,11 @@
 {
   "name": "fcp-midi",
-  "description": "MCP server for semantic MIDI music composition",
+  "description": "Semantic MIDI music composition",
   "version": "0.1.0",
   "license": "MIT",
-  "author": "Scott Meyer",
-  "repository": "https://github.com/aetherwing-io/fcp-midi",
-  "keywords": ["midi", "music", "composition", "mcp"],
-  "mcpServers": {
-    "fcp-midi": {
-      "command": "python",
-      "args": ["-m", "fcp_midi.main"]
-    }
+  "author": {
+    "name": "Scott Meyer"
   },
-  "skills": [
-    {
-      "id": "midi",
-      "name": "MIDI Composition",
-      "description": "Compose MIDI music through semantic operations"
-    }
-  ]
+  "repository": "https://github.com/aetherwing-io/fcp-midi",
+  "keywords": ["midi", "music", "composition", "mcp"]
 }

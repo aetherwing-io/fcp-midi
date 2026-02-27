@@ -3,7 +3,7 @@
     "fcp-midi": {
       "command": "uv",
       "args": ["run", "python", "-m", "fcp_midi"],
-      "cwd": "."
+      "cwd": "${CLAUDE_PLUGIN_ROOT}"
     }
   }
 }
