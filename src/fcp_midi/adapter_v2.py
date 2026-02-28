@@ -48,6 +48,9 @@ class MidiAdapterV2:
         self.note_index: NoteIndex = NoteIndex()
         self.instrument_registry: InstrumentRegistry = InstrumentRegistry()
         self._last_tick: int = 0
+        # Tracker block-mode import state
+        self._tracker_buffer: list[str] | None = None
+        self._tracker_header: str | None = None
 
     # -- FcpDomainAdapter protocol methods --
 
@@ -115,14 +118,36 @@ class MidiAdapterV2:
     ) -> OpResult:
         """Execute a parsed operation on the model.
 
-        1. Take byte snapshot (for undo)
-        2. Build MidiOpContext
-        3. Re-parse through domain parser
-        4. Dispatch to v2 handler
-        5. Rebuild note index
-        6. Log snapshot event
-        7. Return OpResult
+        1. Check for tracker block-mode intercept
+        2. Take byte snapshot (for undo)
+        3. Build MidiOpContext
+        4. Re-parse through domain parser
+        5. Dispatch to v2 handler
+        6. Rebuild note index
+        7. Log snapshot event
+        8. Return OpResult
         """
+        raw = op.raw.strip()
+
+        # -- Tracker block-mode intercept --
+        # Accumulating step lines into buffer
+        if self._tracker_buffer is not None:
+            if raw.lower().startswith("tracker") and "end" in raw.lower():
+                return self._flush_tracker(model, log)
+            # Nested tracker blocks are forbidden
+            if raw.lower().startswith("tracker") and "import" in raw.lower():
+                return OpResult(success=False, message="Nested tracker blocks are not allowed")
+            self._tracker_buffer.append(raw)
+            return OpResult(success=True, message="", prefix="~")
+
+        # Start a new tracker block
+        if raw.lower().startswith("tracker") and "import" in raw.lower():
+            return self._start_tracker(raw, model)
+
+        # -- End tracker-end without prior import --
+        if raw.lower().startswith("tracker") and "end" in raw.lower():
+            return OpResult(success=False, message="'tracker end' without prior 'tracker ... import'")
+
         # Take pre-op snapshot
         before = model.snapshot()
 
@@ -183,6 +208,114 @@ class MidiAdapterV2:
         """Redo — restore from after-snapshot."""
         model.restore(event.after)
         self.note_index.rebuild(model)
+
+    # -- Tracker block-mode helpers --
+
+    def _start_tracker(self, raw: str, model: MidiModel) -> OpResult:
+        """Begin accumulating tracker step lines."""
+        # Parse: "tracker TRACK import at:POS [res:RES]"
+        parts = raw.split()
+        if len(parts) < 3:
+            return OpResult(success=False, message="Usage: tracker TRACK import at:POS [res:RES]")
+
+        track_name = parts[1]
+        ref = model.get_track(track_name)
+        if ref is None:
+            return OpResult(success=False, message=f"Track '{track_name}' not found")
+
+        self._tracker_buffer = []
+        self._tracker_header = raw
+        return OpResult(success=True, message="", prefix="~")
+
+    def _flush_tracker(self, model: MidiModel, log: CoreEventLog) -> OpResult:
+        """Process accumulated tracker step lines and import notes."""
+        from fcp_midi.server.tracker_format import (
+            parse_step_line,
+            pair_tracker_events,
+            _ticks_per_step,
+        )
+        from fcp_midi.server.ops_context_v2 import get_time_sigs
+        from fcp_midi.parser.position import parse_position
+
+        header = self._tracker_header or ""
+        buffer = self._tracker_buffer or []
+        self._tracker_buffer = None
+        self._tracker_header = None
+
+        # Parse header: "tracker TRACK import at:POS [res:RES]"
+        parts = header.split()
+        track_name = parts[1] if len(parts) > 1 else ""
+        ref = model.get_track(track_name)
+        if ref is None:
+            return OpResult(success=False, message=f"Track '{track_name}' not found")
+
+        # Extract params
+        at_pos: str | None = None
+        resolution = "16th"
+        for p in parts:
+            if p.startswith("at:"):
+                at_pos = p[3:]
+            elif p.startswith("res:"):
+                resolution = p[4:]
+
+        time_sigs = get_time_sigs(model)
+        ppqn = model.ppqn
+
+        if at_pos is None:
+            return OpResult(success=False, message="Missing at: parameter for tracker import")
+
+        try:
+            start_tick = parse_position(at_pos, time_sigs, ppqn)
+        except ValueError as e:
+            return OpResult(success=False, message=f"Invalid position: {e}")
+
+        try:
+            tps = _ticks_per_step(resolution, ppqn)
+        except ValueError as e:
+            return OpResult(success=False, message=str(e))
+
+        # Take before-snapshot
+        before = model.snapshot()
+
+        # Parse step lines
+        steps: list[tuple[int, list[tuple[int, int, int]]]] = []
+        for line in buffer:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                step_data = parse_step_line(line)
+                steps.append(step_data)
+            except ValueError as e:
+                # Restore and report error
+                return OpResult(success=False, message=f"Bad step line: {e}")
+
+        if not steps:
+            return OpResult(success=False, message="No step lines in tracker block")
+
+        # Pair ON/OFF events into notes
+        paired = pair_tracker_events(steps, start_tick, tps)
+
+        # Add notes to model
+        for pitch, velocity, abs_tick, duration in paired:
+            model.add_note(track_name, pitch, abs_tick, duration, velocity)
+
+        # Rebuild index
+        self.note_index.rebuild(model)
+
+        # Log snapshot for undo
+        after = model.snapshot()
+        log.append(SnapshotEvent(
+            before=before,
+            after=after,
+            summary=f"tracker import {track_name} ({len(paired)} notes)",
+        ))
+
+        return OpResult(
+            success=True,
+            message=f"Imported {len(paired)} notes from {len(steps)} steps",
+            prefix="+",
+        )
 
     # -- Internal dispatch --
 

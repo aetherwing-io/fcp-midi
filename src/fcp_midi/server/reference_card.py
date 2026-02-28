@@ -83,7 +83,9 @@ _QUERY_SECTION = """\
   stats              Song statistics
   status             Session status
   find PITCH         Search notes by pitch
-  piano-roll TRACK M.B-M.B  ASCII visualization
+  tracker TRACK M.B-M.B [res:RES]  Tracker step view (single track)
+  tracker Track1,Track2 M.B-M.B [res:RES]  Multi-track combined view (read-only)
+  tracker * M.B-M.B [res:RES]     All tracks combined view (read-only)
   history N          Recent N events from log
   diff checkpoint:NAME  Events since checkpoint
   instruments [FILTER] List available instruments"""

@@ -34,7 +34,7 @@ def register_tools(mcp: FastMCP, intent: IntentLayer) -> None:
     def midi_query(q: str) -> str:
         """Query song state: 'map', 'tracks', 'events Piano',
         'events Piano 1.1-4.4', 'stats', 'describe Piano',
-        'piano-roll Piano 1.1-8.4', 'find C4', 'history 5'"""
+        'tracker Piano 1.1-8.4', 'find C4', 'history 5'"""
         return intent.execute_query(q)
 
     @mcp.tool

@@ -54,6 +54,7 @@ _TRACK_TARGET_VERBS = {
     "mute",
     "solo",
     "program",
+    "tracker",
 }
 
 # Verbs that take a single value positional arg

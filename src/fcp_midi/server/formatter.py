@@ -216,6 +216,7 @@ def format_describe(track: Track, song: Song) -> str:
     return "\n".join(lines)
 
 
+# Deprecated — kept for human reference (legacy semantic model)
 def format_piano_roll(
     track: Track,
     song: Song,

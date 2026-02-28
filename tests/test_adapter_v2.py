@@ -322,11 +322,12 @@ class TestDispatchQuery:
         result = adapter.dispatch_query("events Piano", model_with_piano)
         assert "Events on Piano" in result
 
-    def test_piano_roll_query(self, adapter: MidiAdapterV2, model_with_piano: MidiModel) -> None:
+    def test_tracker_query(self, adapter: MidiAdapterV2, model_with_piano: MidiModel) -> None:
         log = CoreEventLog()
         _dispatch(adapter, model_with_piano, log, "note Piano C4 at:1.1 dur:quarter")
-        result = adapter.dispatch_query("piano-roll Piano 1.1-2.4", model_with_piano)
-        assert "Piano roll:" in result
+        result = adapter.dispatch_query("tracker Piano 1.1-2.4", model_with_piano)
+        assert "[Resolution:" in result
+        assert "[C4_v" in result
 
 
 # ===========================================================================

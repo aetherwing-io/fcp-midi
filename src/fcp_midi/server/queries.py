@@ -41,7 +41,7 @@ def dispatch_query(q: str, ctx: OpContext) -> str:
         return _query_status(ctx)
     elif command == "find":
         return _query_find(args, ctx)
-    elif command == "piano-roll":
+    elif command in ("piano-roll", "tracker"):
         return _query_piano_roll(args, ctx)
     elif command == "history":
         return _query_history(args, ctx.event_log)

@@ -49,8 +49,8 @@ def dispatch_query_v2(q: str, ctx: MidiOpContext) -> str:
         return _query_status(ctx)
     elif command == "find":
         return _query_find(args, ctx)
-    elif command == "piano-roll":
-        return _query_piano_roll(args, ctx)
+    elif command == "tracker":
+        return _query_tracker(args, ctx)
     elif command == "history":
         return _query_history(args, ctx)
     elif command == "instruments":
@@ -58,7 +58,7 @@ def dispatch_query_v2(q: str, ctx: MidiOpContext) -> str:
     else:
         return (
             f"! Unknown query: {command!r}\n"
-            "  try: map, tracks, events, describe, stats, find, piano-roll, history, instruments"
+            "  try: map, tracks, events, describe, stats, find, tracker, history, instruments"
         )
 
 
@@ -420,16 +420,70 @@ def _query_find(args: str, ctx: MidiOpContext) -> str:
 
 
 # ---------------------------------------------------------------------------
-# piano-roll
+# tracker
 # ---------------------------------------------------------------------------
 
-def _query_piano_roll(args: str, ctx: MidiOpContext) -> str:
+def _query_tracker(args: str, ctx: MidiOpContext) -> str:
     parts = args.strip().split()
     if len(parts) < 2:
-        return "! Usage: piano-roll TRACK M.B-M.B\n  try: piano-roll Piano 1.1-8.4"
+        return "! Usage: tracker TRACK M.B-M.B [res:RESOLUTION]\n  try: tracker Piano 1.1-8.4"
 
     track_name = parts[0]
     model = ctx.model
+    time_sigs = get_time_sigs(model)
+    ppqn = model.ppqn
+
+    range_str = parts[1]
+    range_parts = range_str.split("-")
+    if len(range_parts) != 2:
+        return "! Invalid range format.\n  try: tracker Piano 1.1-8.4"
+
+    try:
+        start_tick = parse_position(range_parts[0], time_sigs, ppqn)
+        end_tick = parse_position(range_parts[1], time_sigs, ppqn)
+    except ValueError as e:
+        return f"! Invalid range: {e}"
+
+    # Parse optional res: parameter
+    resolution: str | None = None
+    for p in parts[2:]:
+        if p.startswith("res:"):
+            resolution = p[4:]
+
+    # --- Multi-track path: * or comma-separated names ---
+    if track_name == "*" or "," in track_name:
+        if track_name == "*":
+            names = list(model.track_order)
+        else:
+            names = [n.strip() for n in track_name.split(",") if n.strip()]
+
+        # Resolve each track
+        track_data: list[tuple[str, list, bool]] = []
+        missing: list[str] = []
+        for tname in names:
+            ref = model.get_track(tname)
+            if not ref:
+                missing.append(tname)
+                continue
+            notes = pair_notes(ref.track, track_name=tname)
+            is_drum = ref.channel == 9
+            track_data.append((tname, notes, is_drum))
+
+        if missing and not track_data:
+            return f"! No matching tracks found. Missing: {', '.join(missing)}"
+
+        if not track_data:
+            return "! No tracks to display."
+
+        from fcp_midi.server.tracker_format import format_tracker_multi
+        result = format_tracker_multi(
+            track_data, time_sigs, ppqn, start_tick, end_tick, resolution,
+        )
+        if missing:
+            result += f"\n! Tracks not found: {', '.join(missing)}"
+        return result
+
+    # --- Single-track path (unchanged) ---
     ref = model.get_track(track_name)
     if not ref:
         suggestion = suggest_track_name_v2(model, track_name)
@@ -438,68 +492,16 @@ def _query_piano_roll(args: str, ctx: MidiOpContext) -> str:
             msg += f"\n  try: {suggestion}"
         return f"! {msg}"
 
-    time_sigs = get_time_sigs(model)
-    ppqn = model.ppqn
-
-    range_str = parts[1]
-    range_parts = range_str.split("-")
-    if len(range_parts) != 2:
-        return "! Invalid range format.\n  try: piano-roll Piano 1.1-8.4"
-
-    try:
-        start_tick = parse_position(range_parts[0], time_sigs, ppqn)
-        end_tick = parse_position(range_parts[1], time_sigs, ppqn)
-    except ValueError as e:
-        return f"! Invalid range: {e}"
-
     notes = pair_notes(ref.track, track_name=track_name)
-    in_range = [
-        n for n in notes
-        if n.abs_tick + n.duration_ticks > start_tick and n.abs_tick < end_tick
-    ]
 
-    if not in_range:
-        return f"No notes on {track_name} in range."
+    # Look up instrument name for header display
+    if ref.channel == 9:
+        instrument = "drums"
+    else:
+        instrument = _instrument_name(ref.program)
 
-    midi_low = min(n.pitch for n in in_range)
-    midi_high = max(n.pitch for n in in_range)
-    midi_low = max(0, midi_low - 1)
-    midi_high = min(127, midi_high + 1)
-
-    ts = time_sigs[0] if time_sigs else None
-    denom = ts.denominator if ts else 4
-    beat_ticks = ppqn * 4 // denom
-
-    n_cols = max(1, (end_tick - start_tick) // beat_ticks)
-    if n_cols > 64:
-        n_cols = 64
-        beat_ticks = (end_tick - start_tick) // n_cols
-
-    rows = midi_high - midi_low + 1
-    grid: list[list[str]] = [["." for _ in range(n_cols)] for _ in range(rows)]
-
-    for note in in_range:
-        row = midi_high - note.pitch
-        col_start = max(0, (note.abs_tick - start_tick) // beat_ticks)
-        note_end = note.abs_tick + note.duration_ticks
-        col_end = min(n_cols, (note_end - start_tick + beat_ticks - 1) // beat_ticks)
-        for c in range(int(col_start), int(col_end)):
-            if 0 <= c < n_cols:
-                grid[row][c] = "#"
-
-    lines: list[str] = []
-    for row_idx in range(rows):
-        midi_num = midi_high - row_idx
-        note_in_oct = midi_num % 12
-        octave = (midi_num // 12) - 1
-        name, acc = _MIDI_TO_NOTE[note_in_oct]
-        label = f"{name}{acc}{octave}".ljust(5)
-        lines.append(f"{label}|{''.join(grid[row_idx])}|")
-
-    start_pos = ticks_to_position(start_tick, time_sigs, ppqn)
-    end_pos = ticks_to_position(end_tick, time_sigs, ppqn)
-    header = f"Piano roll: {track_name} ({start_pos} - {end_pos})"
-    return "\n".join([header] + lines)
+    from fcp_midi.server.tracker_format import format_tracker
+    return format_tracker(notes, track_name, time_sigs, ppqn, start_tick, end_tick, resolution, instrument=instrument)
 
 
 # ---------------------------------------------------------------------------

@@ -388,27 +388,38 @@ class TestQueryEvents:
         assert "--- Bass ---" in result
 
 
-class TestQueryPianoRoll:
-    def test_piano_roll_basic(self):
+class TestQueryTracker:
+    def test_tracker_basic(self):
         ctx = _make_ctx([
             {"name": "Piano", "notes": [
                 {"pitch": 60, "tick": 0, "dur": 480},
                 {"pitch": 64, "tick": 0, "dur": 480},
             ]},
         ])
-        result = dispatch_query_v2("piano-roll Piano 1.1-2.4", ctx)
-        assert "Piano roll:" in result
-        assert "#" in result
+        result = dispatch_query_v2("tracker Piano 1.1-2.4", ctx)
+        assert "[Resolution:" in result
+        assert "[Track: Piano" in result
+        assert "[C4_v" in result
+        assert "[E4_v" in result
 
-    def test_piano_roll_missing_args(self):
+    def test_tracker_missing_args(self):
         ctx = _make_ctx()
-        result = dispatch_query_v2("piano-roll", ctx)
+        result = dispatch_query_v2("tracker", ctx)
         assert "Usage:" in result
 
-    def test_piano_roll_track_not_found(self):
+    def test_tracker_track_not_found(self):
         ctx = _make_ctx([{"name": "Piano", "notes": []}])
-        result = dispatch_query_v2("piano-roll Drums 1.1-4.4", ctx)
+        result = dispatch_query_v2("tracker Drums 1.1-4.4", ctx)
         assert "not found" in result
+
+    def test_tracker_with_resolution(self):
+        ctx = _make_ctx([
+            {"name": "Piano", "notes": [
+                {"pitch": 60, "tick": 0, "dur": 240},
+            ]},
+        ])
+        result = dispatch_query_v2("tracker Piano 1.1-2.4 res:8th", ctx)
+        assert "[Resolution: 8th]" in result
 
 
 class TestQueryHistory:

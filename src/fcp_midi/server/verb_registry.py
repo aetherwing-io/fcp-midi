@@ -174,6 +174,15 @@ VERBS: list[VerbSpec] = [
         params=["from", "to"],
         description="Apply gradual velocity decrease.",
     ),
+
+    # Block import
+    VerbSpec(
+        verb="tracker",
+        syntax="tracker TRACK import at:POS [res:RES] ... tracker end",
+        category="music",
+        params=["at", "res"],
+        description="Import notes from tracker step format (block mode).",
+    ),
 ]
 
 
