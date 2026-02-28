@@ -1,6 +1,6 @@
 [project]
 name = "fcp-midi"
-version = "0.1.0"
+version = "0.1.1"
 description = "MIDI File Context Protocol — semantic MIDI composition for LLMs"
 requires-python = ">=3.11,<3.14"
 dependencies = [
@@ -12,6 +12,9 @@ dependencies = [
 # [tool.uv.sources]
 # For local development, uncomment below:
 # fcp-core = { path = "../fcp-core/python", editable = true }
+
+[project.scripts]
+fcp-midi = "fcp_midi.main:main"
 
 [project.optional-dependencies]
 dev = [
