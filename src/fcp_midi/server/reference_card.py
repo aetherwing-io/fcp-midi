@@ -16,14 +16,8 @@ _registry = VerbRegistry()
 _registry.register_many(VERBS)
 
 
-# -----------------------------------------------------------------------
-# Extra sections for the reference card (MIDI-specific)
-# -----------------------------------------------------------------------
-
-_EXTRA_SECTIONS: dict[str, str] = {}
-
-_SELECTORS_SECTION = """\
-## Selectors
+_EXTRA_SECTIONS: dict[str, str] = {
+    "SELECTORS": """\
   @track:NAME        Notes on a specific track
   @channel:N         Notes on MIDI channel N
   @range:M.B-M.B    Notes in range (inclusive start and end beats)
@@ -35,47 +29,33 @@ _SELECTORS_SECTION = """\
   @not:TYPE:VALUE    Negate a selector (exclude matches)
 
   Combine selectors to intersect: @track:Piano @range:1.1-4.4
-  Negate to exclude: @track:Piano @not:pitch:C4"""
-
-_POSITION_SECTION = """\
-## Position Syntax
+  Negate to exclude: @track:Piano @not:pitch:C4""",
+    "POSITION SYNTAX": """\
   M.B                Measure.Beat (1-based): 1.1 = start
   M.B.T              With tick offset: 1.1.120
   tick:N             Raw absolute tick
   +DUR               Relative: reference tick + duration
   -DUR               Relative: reference tick - duration
-  end                Song end (last note end tick)"""
-
-_DURATION_SECTION = """\
-## Duration Syntax
+  end                Song end (last note end tick)""",
+    "DURATION SYNTAX": """\
   whole, half, quarter, eighth, sixteenth, 32nd
   1n, 2n, 4n, 8n, 16n, 32n
   dotted-quarter, triplet-eighth
-  ticks:N            Raw tick count"""
-
-_PITCH_SECTION = """\
-## Pitch Syntax
+  ticks:N            Raw tick count""",
+    "PITCH SYNTAX": """\
   C4, D#5, Bb3       Note + accidental + octave
-  midi:60            Raw MIDI number (60 = middle C)"""
-
-_CHORD_SECTION = """\
-## Chord Symbols
+  midi:60            Raw MIDI number (60 = middle C)""",
+    "CHORD SYMBOLS": """\
   Cmaj, Am, Dm7, G7, Bdim, Faug, Csus4, Asus2
   Cmaj7, Am7, Dm7b5, G9, Cm6, Cadd9
-  Dm/F               Slash chord (inversion)"""
-
-_VELOCITY_SECTION = """\
-## Velocity Syntax
+  Dm/F               Slash chord (inversion)""",
+    "VELOCITY SYNTAX": """\
   0-127              Numeric value
-  ppp, pp, p, mp, mf, f, ff, fff   Dynamic names"""
-
-_CC_SECTION = """\
-## CC Names
+  ppp, pp, p, mp, mf, f, ff, fff   Dynamic names""",
+    "CC NAMES": """\
   volume, pan, modulation, expression, sustain,
-  reverb, chorus, brightness, portamento, breath"""
-
-_QUERY_SECTION = """\
-## Query Commands (via `midi_query` tool)
+  reverb, chorus, brightness, portamento, breath""",
+    "QUERY COMMANDS": """\
   map                Song overview
   tracks             List all tracks
   events TRACK|*|all [M.B-M.B]  Events on a track (or all)
@@ -88,10 +68,8 @@ _QUERY_SECTION = """\
   tracker * M.B-M.B [res:RES]     All tracks combined view (read-only)
   history N          Recent N events from log
   diff checkpoint:NAME  Events since checkpoint
-  instruments [FILTER] List available instruments"""
-
-_SESSION_SECTION = """\
-## Session Actions (via `midi_session` tool)
+  instruments [FILTER] List available instruments""",
+    "SESSION ACTIONS": """\
   new "Title" [tempo:N] [time-sig:N/D] [key:K] [ppqn:N]
   open ./file.mid
   save
@@ -99,24 +77,18 @@ _SESSION_SECTION = """\
   checkpoint NAME
   undo [to:NAME]
   redo
-  load-soundfont PATH"""
-
-_GM_SECTION = """\
-## GM Instruments (examples)
+  load-soundfont PATH""",
+    "GM INSTRUMENTS (EXAMPLES)": """\
   acoustic-grand-piano, electric-piano-1, vibraphone
   acoustic-guitar-nylon, electric-bass-finger, violin
-  trumpet, alto-sax, flute, string-ensemble-1"""
-
-_CUSTOM_INSTRUMENTS_SECTION = """\
-## Custom Instruments
+  trumpet, alto-sax, flute, string-ensemble-1""",
+    "CUSTOM INSTRUMENTS": """\
   program:N           Raw MIDI program number (0-127)
   bank:MSB            Bank select (MSB only)
   bank:MSB.LSB        Bank select (MSB and LSB)
   load-soundfont PATH Load presets from .sf2 file
-  instruments [FILTER] Query available instruments"""
-
-_EXAMPLE_SECTION = """\
-## Example Workflow
+  instruments [FILTER] Query available instruments""",
+    "EXAMPLE WORKFLOW": """\
   1. midi_session('new "My Song" tempo:120 time-sig:4/4 key:C-major')
   2. midi(['track add Piano instrument:acoustic-grand-piano'])
   3. midi(['track add Bass instrument:acoustic-bass'])
@@ -126,46 +98,39 @@ _EXAMPLE_SECTION = """\
   5. midi(['note Bass C2 at:1.1 dur:half vel:f'])
   6. midi_query('map')
   7. midi_session('checkpoint v1')
-  8. midi_session('save as:./my-song.mid')"""
+  8. midi_session('save as:./my-song.mid')""",
+}
 
 
 def _build_reference_card() -> str:
     """Build the reference card from the verb registry and static sections."""
     lines: list[str] = []
-    lines.append("# MIDI FCP Reference Card")
-    lines.append("")
-    lines.append("## Mutation Operations (via `midi` tool)")
 
     # Group verbs by category, preserving insertion order with custom titles
     categories = {
-        "music": "Notes, Chords & Tracks",
-        "meta": "Tempo, Time & Key",
-        "editing": "Editing (selector-based)",
-        "state": "Track State",
+        "music": "NOTES, CHORDS & TRACKS",
+        "meta": "TEMPO, TIME & KEY",
+        "editing": "EDITING (SELECTOR-BASED)",
+        "state": "TRACK STATE",
     }
     for cat_key, cat_title in categories.items():
         cat_verbs = [v for v in _registry.verbs if v.category == cat_key]
         if not cat_verbs:
             continue
-        lines.append(f"")
-        lines.append(f"### {cat_title}")
+        lines.append(f"{cat_title}:")
         for v in cat_verbs:
             lines.append(f"  {v.syntax}")
+        lines.append("")
 
-    # Static sections below
-    lines.append("")
-    lines.append(_SELECTORS_SECTION)
-    lines.append(_POSITION_SECTION)
-    lines.append(_DURATION_SECTION)
-    lines.append(_PITCH_SECTION)
-    lines.append(_CHORD_SECTION)
-    lines.append(_VELOCITY_SECTION)
-    lines.append(_CC_SECTION)
-    lines.append(_QUERY_SECTION)
-    lines.append(_SESSION_SECTION)
-    lines.append(_GM_SECTION)
-    lines.append(_CUSTOM_INSTRUMENTS_SECTION)
-    lines.append(_EXAMPLE_SECTION)
+    # Static sections
+    for title, content in _EXTRA_SECTIONS.items():
+        lines.append(f"{title}:")
+        lines.append(content)
+        lines.append("")
+
+    # Remove trailing empty lines
+    while lines and lines[-1] == "":
+        lines.pop()
 
     return "\n".join(lines)
 
