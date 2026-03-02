@@ -7,16 +7,6 @@ with the MIDI domain adapter.
 from fcp_core import create_fcp_server
 
 from fcp_midi.adapter import MidiAdapter
-from fcp_midi.server.reference_card import (
-    _SELECTORS_SECTION,
-    _POSITION_SECTION,
-    _DURATION_SECTION,
-    _PITCH_SECTION,
-    _CHORD_SECTION,
-    _VELOCITY_SECTION,
-    _CC_SECTION,
-    _GM_SECTION,
-)
 from fcp_midi.server.verb_registry import VERBS
 
 # Extra sections for the tool description (MIDI-specific reference)
