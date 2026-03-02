@@ -1,6 +1,6 @@
 [project]
 name = "fcp-midi"
-version = "0.1.6"
+version = "0.1.7"
 description = "MIDI File Context Protocol — semantic MIDI composition for LLMs"
 requires-python = ">=3.11,<3.14"
 dependencies = [
