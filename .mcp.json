@@ -1,9 +1,8 @@
 {
   "mcpServers": {
-    "fcp-midi": {
-      "command": "uv",
-      "args": ["run", "python", "-m", "fcp_midi"],
-      "cwd": "${CLAUDE_PLUGIN_ROOT}"
+    "midi": {
+      "command": "uvx",
+      "args": ["--refresh-package", "fcp-midi", "--python", "3.13", "fcp-midi"]
     }
   }
 }
