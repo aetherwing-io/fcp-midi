@@ -67,8 +67,8 @@ mcp = create_fcp_server(
     verbs=VERBS,
     extra_sections=_EXTRA_SECTIONS,
     extensions=["mid", "midi"],
-    name="midi-fcp",
-    instructions="MIDI File Context Protocol. Call midi_help for the reference card.",
+    name="fcp-midi",
+    instructions="FCP MIDI server for composing and editing MIDI music files programmatically. Use midi_session to create a new composition or open an existing MIDI file, midi to add tracks, notes, chords, and musical patterns, midi_query to inspect tracks, notes, and composition state, and midi_help for the full verb reference. Start every interaction with midi_session.",
 )
 
 
